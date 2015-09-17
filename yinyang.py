@@ -3,24 +3,39 @@ import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils.extmath import row_norms
 
+def _calculate_cost(X, y, centers):
+    """
+    Return the cost function. Ideally this should decrease per iteration.
+    """
+    n_clusters = len(centers)
+    cost = 0
+    for i in range(n_clusters):
+        mask = y == i
+        cost += np.sum((X[mask] - centers[i])**2)
+    return cost
+
+
 class YinyangKMeans(BaseEstimator, ClusterMixin):
     """
     Scikit-learn compatible K-Means clusterer based on
     http://jmlr.org/proceedings/papers/v37/ding15.pdf
     """
-
     def __init__(self, n_clusters=3, init="random", max_iter=300, tol=0.0001,
-                 random_state=None):
+                 random_state=None, return_cost_per_iteration=False):
         self.n_clusters = n_clusters
         self.init = init
         self.max_iter = max_iter
         self.tol = tol
         self.random_state = random_state
+        self.return_cost_per_iteration = return_cost_per_iteration
 
     def fit(self, X):
         rng = np.random.RandomState(self.random_state)
         new_cluster_centers = np.zeros((self.n_clusters, X.shape[1]))
         n_samples_arrays = np.arange(X.shape[0])
+
+        if self.return_cost_per_iteration:
+            self.cost_array_ = np.zeros(self.max_iter)
 
         if self.n_clusters > 20:
             raise ValueError("Group clustering not supported yet")
@@ -48,6 +63,9 @@ class YinyangKMeans(BaseEstimator, ClusterMixin):
         self.cluster_centers_ = new_cluster_centers
 
         for n_iter in range(self.max_iter):
+
+            if self.return_cost_per_iteration:
+                self.cost_array_[n_iter] = _calculate_cost(X, self.labels_, self.cluster_centers_)
 
             # Calculate how much each center has drifted.
             drift = ((old_cluster_centers_ - self.cluster_centers_)**2).sum(axis=1)
